@@ -1,0 +1,65 @@
+#pragma once
+
+#include <expat.h>
+
+#include <climits>
+#include <functional>
+#include <memory>
+
+#include "../ParsedText.h"
+#include "../blocks/TextBlock.h"
+
+class Page;
+class GfxRenderer;
+
+#define MAX_WORD_SIZE 200
+
+class ChapterHtmlSlimParser {
+  const char* filepath;
+  GfxRenderer& renderer;
+  std::function<void(std::unique_ptr<Page>)> completePageFn;
+  int depth = 0;
+  int skipUntilDepth = INT_MAX;
+  int boldUntilDepth = INT_MAX;
+  int italicUntilDepth = INT_MAX;
+  // buffer for building up words from characters, will auto break if longer than this
+  // leave one char at end for null pointer
+  char partWordBuffer[MAX_WORD_SIZE + 1] = {};
+  int partWordBufferIndex = 0;
+  std::unique_ptr<ParsedText> currentTextBlock = nullptr;
+  std::unique_ptr<Page> currentPage = nullptr;
+  int16_t currentPageNextY = 0;
+  int fontId;
+  float lineCompression;
+  int marginTop;
+  int marginRight;
+  int marginBottom;
+  int marginLeft;
+  bool extraParagraphSpacing;
+
+  void startNewTextBlock(TextBlock::BLOCK_STYLE style);
+  void makePages();
+  // XML callbacks
+  static void XMLCALL startElement(void* userData, const XML_Char* name, const XML_Char** atts);
+  static void XMLCALL characterData(void* userData, const XML_Char* s, int len);
+  static void XMLCALL endElement(void* userData, const XML_Char* name);
+
+ public:
+  explicit ChapterHtmlSlimParser(const char* filepath, GfxRenderer& renderer, const int fontId,
+                                 const float lineCompression, const int marginTop, const int marginRight,
+                                 const int marginBottom, const int marginLeft, const bool extraParagraphSpacing,
+                                 const std::function<void(std::unique_ptr<Page>)>& completePageFn)
+      : filepath(filepath),
+        renderer(renderer),
+        fontId(fontId),
+        lineCompression(lineCompression),
+        marginTop(marginTop),
+        marginRight(marginRight),
+        marginBottom(marginBottom),
+        marginLeft(marginLeft),
+        extraParagraphSpacing(extraParagraphSpacing),
+        completePageFn(completePageFn) {}
+  ~ChapterHtmlSlimParser() = default;
+  bool parseAndBuildPages();
+  void addLineToPage(std::shared_ptr<TextBlock> line);
+};
